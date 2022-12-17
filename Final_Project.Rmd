@@ -1,0 +1,564 @@
+---
+title: "BST260-Final_Project"
+author: "Chunlei Yang"
+date: "2022-12-11"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Regression Analysis and Machine Learning for Stroke Prediction
+
+## Introduction
+
+### Dataset and Question
+ 
+According to WHO, stroke has been the 2nd leading cause of death globally, responsible for approximately 11% of total deaths. It is meaningful to predict stroke incidence based on some health indicators.
+ 
+The dataset I used is from Kaggle, which includes categorical variables, such as gender, the incidence of hypertension and heart disease, marriage status, work type, residence type, and smoking status, and continuous variables, like age, the average glucose level in the blood, and BMI. The outcome variable is whether the patient had a stroke or not. This dataset contains 5110 observations in total.
+ 
+We want to study what characteristic of a patient is more likely to get a stroke and how to predict the incidence of stroke based on these factors. We will use all variables as predictors and stroke incidence as the outcome to build machine learning models and determine the model with the best accuracy. 
+ 
+### Data Cleaning
+
+Overall, this dataset is ready to use, but some places still need to be cleaned. BMI is stored as the character, so we need to change it to numeric data. Also, there are some NAs in the BMI column. Because only 3.93% of BMI records are missing, we can simply use the gender-specific BMI average to fill in those missing data. Also, there are 30.2% of smoking statuses missing. From missing data analysis, we can find out that the missing data for smoking may not be due to MCAR, so we cannot simply use mean or median to generate so much missing data. We need to use the mice (Multiple Imputation by Chained Equations) package, providing missing value imputation methods to generate missing values. 
+
+### EDA & Data Pre-Processing
+
+The Frequency of Categorical Levels plot displays the proportion of each variable and its categories. We can notice that in this sample, female is more than male (59% vs. 41%), and ever-married people are more than never-married people (66% vs. 34%). Also, 90% of people have no incidence of hypertension, and 95% of participants never had heart disease. More than half people never smoked, and 20% of the participants are smokers now. Note that 13% of participants are children. 
+
+The Histograms of Numeric Columns and data summary show that half of the people in this sample are aged between 25 to 61, with a mean of 43.2. Half of the people’s average glucose levels are between 77 and 114, with a mean of 106. Most people have a BMI of 20 to 40. 
+ 
+What’s more, we calculate the correlation between stroke and all other factors and make the plot. From this initial study, we can find there are four main driving factors that lead to the incidence of stroke, which are age (older compared to younger), heart disease, higher glucose level, and hypertension, which is expected based on our intuition. But we need to further study the association in our regression model.
+ 
+There is a very important issue with imbalanced data. We can notice that only 249 (4.9%) subjects have the incidence of stroke, which means even guessing the person does not have a stroke can achieve an accuracy of 95%. If we do not deal with this imbalance, even if the accuracy is high, the sensitivity may be rather low, which means the model cannot predict true positive cases very well, so we need to deal with this imbalance. I use the MWMOTE (majority Weighted Minority Oversampling Technique for Imbalanced Data Set Learning) method in the imbalance package to generate stroke data. The simulation results show that our method is better than or comparable with some other existing methods in terms of various assessment metrics. 
+ 
+### Methodology
+
+I will split my data to train data and test data into 80% and 20% and use 10-fold validation to perform cross-validation when we train the data. For the model choices, I use logistic regression, which is suitable for categorical data. Also, for the machine learning part, I use the random forest, boosted trees (XGBoost), KNN, SVM (support vector machine), LDA, and Neural Network methods in machine learning to train and test data. I will mainly use the caret package, providing me train function. And for some models, I will also use a tuning grid to find the best tune for this model to increase the accuracy. In the end, I will use the test data to predict the outcome and calculate the confusion matrix and get the accuracy of all these methods and find the best model.
+
+
+## Results
+
+### Logistic Regression
+
+First, I fit a logistic regression including all variables. Based on the summary table of logistic regression, we can notice that age, hypertension, heart disease, average glucose level, BMI, and smoking are significantly associated with the incidence of stroke, controlling for all other variables. Furthermore, I chose a stepwise method based on AIC to remove non-significant variables. In the stepwise logistic regression model, gender and residence type are removed. We find that age (older), average glucose level (higher), BMI (lower), heart disease, hypertension, and smoking are a statistically significant impact on whether a person has a stroke or not. Most of them are expected, while BMI is negatively associated with the incidence of stroke. It may be due to some selection bias in this data sample. One of the most detrimental factors is smoking. The odds ratio of the incidence of stroke among people who are smokers now is 2.03 times higher than those who have never smoked. Even the odds ratio among former smokers is 2.07 times higher. Also, the odds ratio of the incidence of stroke increases by 11% for every year increase in age, and the p-value is almost 0, so age is highly associated with the incidence of stroke. What’s more, the odds ratio among people who has hypertension and among people with heart disease is 45.3% and 34.2% higher. Those estimates agree well with our EDA.
+ 
+Logistic regression is very useful for us to determine what characteristic of a patient is more likely to get a stroke, but it is not a good method to predict because the accuracy for logistic regression and stepwise logistic regression is 0.827 and 0.809, not good enough. We need to use some other machine learning methods to get the better prediction.
+ 
+### Random Forest
+
+Random forest is a great machine learning approach to address the shortcomings of decision trees, improving prediction performance and reducing instability by averaging multiple decision trees. Also, instead of the “rf” method, I use the “ranger” method to increase the speed of calculation for random forest algorithms. From the plot of random forest fit, we can see the error does not decrease when the number of trees is larger than 300. The random forest model gets a very high accuracy of 0.9393. The sensitivity is 0.9208, and the specificity is 0.9578
+ 
+I also evaluate the importance of the variables in terms of making predictions. From the plot of importance, we can find the dominant predictor is age, which importance is far beyond other variables. Also, the other two main predictors are BMI and average glucose level. It seems that only continous variables have more importance.
+ 
+### Gradient Boosted Trees
+
+Like random forests, gradient boosting trees also combine decision trees but start the combining process at the beginning instead of at the end. Random forests build each tree independently, while gradient boosting builds one tree at a time. Usually, gradient boosting trees will get better accuracy than random forests. For the stroke dataset, the gradient boosting trees model has an accuracy of 0.9594, with a sensitivity of 0.9578 and specificity of 0.9609, which are high enough. 
+           
+### KNN
+
+In KNN, the outcome is classified by a plurality vote of its neighbors, which is a very popular model. However, KNN seems to perform not so well dealing with categorical data. This is true when many of the scales in my model are categorical. It is hard to tell the distance between numerical and categorical variables like age and marital status, or within categorical variables, like private work and self-employed. We want to find out the optimized k for our KNN model, and we find 2 is the optimized k. In conclusion, although the accuracy is 0.8704, I think it is not appropriate to use KNN for this dataset. 
+ 
+### SVM
+
+SVM (Support Vector Machine) is a model that draws a boundary that clearly separates two or more classes for classification. We need to choose different C values to tune our model. The accuracy for SVM is relatively low, 0.8266.
+
+### LDA 
+
+LDA (Linear Discriminant Analysis) is a generalization of Fisher's linear discriminant to find a linear combination of features that characterizes or separates two or more classes of objects or events. We also fit the LDA model using caret, and the accuracy is 0.8272, which is not good enough.
+ 
+
+### Neural Network
+
+A neural network is a biologically inspired method for computers to learn through analyzing data. We can use the nnet package to fit a single-hidden-layer feed-forward neural network using multinomial log-linear models. Also, we use the caret package to train the model. We need to set the tuning grid. The tuning parameters are weight (decay), and the number of hidden units (size). Also, set the maximum iteration to 1000. The accuracy is 0.9208, which is relatively high. 
+
+
+## Conclusion
+
+From our logistic regression and stepwise regression model, age, higher average glucose level, heart disease, hypertension, and smoking are the main factors to increase the risk of stroke. People with these characteristics should pay much more attention to the potential incidence of stroke. Even as a former smoker, the odds ratio of the incidence of stroke is 2.07 times higher than those who never smoke. Therefore, it is important to choose not to smoke at the beginning to decrease the risk. Also, there is an 11% increase in adds ratio for every year increase in age, so aged people should have regular body exams for potential stroke. Also, other diseases, like hypertension, heart disease, and high glucose level, are also highly associated with the increasing risk of stroke, and this may cause more severe outcomes if the disease is composite. Although we cannot change our age, we could form a good life from healthy diet or regular training to diminish other risk factors such as heart disease, hypertension, or average glucose level, and be a non-smoker, for your health and decrease the risk of stroke. 
+
+Based on our machine learning model, including random forest, gradient boosting trees (XGBoost), KNN, SVM (support vector machine), LDA, and Neural Network, we train these models using caret package and find that random forest, gradient boosting trees, and Neural Network performs relatively better. The model with the best accuracy is gradient boosting trees, with an accuracy of 0.9594, sensitivity of 0.9578, and specificity of 0.9609. The accuracy is higher than 95%, which could be a satisfactory result. The models with the worst accuracy is SVM and LDA, with accuracy of 0.8266 and 0.8272. In conclusion, I would choose gradient boosting trees model for stroke prediction.
+
+The potential issue is the imbalanced data problem. I use MWMOTE to generate data, but they are not categorical, so I just round them to the nearest integer, which may cause some inaccuracy. Also, from the importance plot for the random forest, categorical data does not contribute much to the prediction compared to the continuous variable, and it may limit the accuracy of the random forest. I want to investigate further how to deal with imbalanced data and how to better train categorical data in machine learning nad learn some advanced models in the future. 
+
+
+## Appendix (codes and plots)
+
+### load data
+
+```{r, message=FALSE}
+library(tidyverse)
+library(dplyr)
+library(caret)
+library(randomForest)
+library(imbalance)
+library(cvms)
+library(inspectdf)
+library(ggimage)
+library(rsvg)
+```
+
+```{r, message=FALSE}
+stroke <- read_csv("healthcare-dataset-stroke-data.csv")
+```
+
+
+### data cleaning
+
+Data preview
+```{r}
+str(stroke)
+```
+
+Drop id variable  
+```{r}
+stroke <- stroke |> dplyr::select(-id)
+```
+
+Change bmi to numeric data
+```{r, warning=FALSE}
+stroke <- stroke |> mutate_at("bmi", as.numeric)
+```
+
+Remove Other gender because it only has one row
+```{r}
+stroke |> filter(gender == "Other") |> nrow() # only one row
+stroke <- filter(stroke, gender != "Other")
+```
+
+
+Change some columns to categorical data
+```{r}
+stroke <- stroke |> mutate(gender = factor(gender, levels = c("Female", "Male")),
+                           hypertension = factor(hypertension, labels = c("No", "Yes")),
+                           heart_disease = factor(heart_disease, labels = c("No", "Yes")),
+                           ever_married = factor(ever_married, levels = c("No", "Yes")), 
+                           work_type = factor(work_type, 
+                                          levels = c("children", "Never_worked", "Self-employed", "Private", "Govt_job")), 
+                           Residence_type = factor(Residence_type, levels = c("Rural", "Urban")),
+                           stroke = factor(stroke, labels = c("No", "Yes")))
+```
+
+
+Find NA
+```{r}
+colSums(is.na(stroke))
+```
+
+
+For BMI, Replace NA to mean BMI
+```{r}
+stroke <- stroke |> group_by(gender) |> mutate(bmi = ifelse(is.na(bmi), mean(bmi, na.rm=TRUE), bmi))
+```
+
+
+We can further notice that there is "Unknown" category in Smoking status. Change Unknown to NA.
+
+```{r}
+stroke <- stroke |> mutate(smoking_status = ifelse(smoking_status == "Unknown", NA, smoking_status)) |> mutate(smoking_status = factor(smoking_status, levels = c("never smoked", "formerly smoked", "smokes")))
+```
+
+NA account for 30%
+```{r}
+prop.table(table(stroke$smoking_status, exclude=NULL))
+```
+
+Missing data analysis for smoking_status
+```{r}
+library(finalfit)
+var <- names(stroke)
+explanatory <- var[var != "smoking_status" & var != "bmi"]
+dependent <- var[var == "smoking_status"]
+stroke |> missing_compare(dependent, explanatory)
+```
+
+
+We will use mice package to fill the NA values for smoking status
+```{r, warning=FALSE, message=FALSE}
+library(mice)
+stroke <- mice(stroke, seed = 260)
+stroke <- complete((stroke))
+```
+
+
+### EDA
+
+Summary of the data now
+```{r}
+summary(stroke)
+```
+
+Frequency of Categorical Levels plot 
+
+```{r}
+stroke |> inspect_cat() |> show_plot()
+```
+
+Histograms of Numeric Columns
+
+```{r}
+stroke |> inspect_num() |> show_plot()
+```
+
+Correlation between stroke and all other factors 
+```{r, message=FALSE}
+library(corrr)
+library(ggcorrplot)
+stroke1 <- stroke |> mutate(stroke = as.numeric(stroke))
+dmy <- dummyVars("~ .", data = stroke1)
+onehot <- data.frame(predict(dmy, stroke1))
+cor <-correlate(onehot, use = "pairwise.complete.obs")
+cor |> focus(stroke) |>
+  ggplot(aes(x = reorder(term, stroke), stroke)) +
+  geom_col() + coord_flip() +
+  theme_minimal() + 
+  theme(plot.title = element_text(size = 15, face = "bold", hjust = 0.5)) +
+  labs(y = "Stroke", x = "Factor", title = "Correlation between stroke and all other factors")
+
+rm(stroke1)
+```
+
+Imbalanced data for stroke outcome
+```{r}
+stroke |>
+      ggplot() +
+      geom_bar(aes(x = stroke, fill = stroke), position = "dodge") + 
+      theme_minimal() + 
+      theme(plot.title = element_text(size = 15, face = "bold", hjust = 0.5)) +
+      labs(y = "count", title = "Stroke Distribution")
+```
+
+
+Only 5% of people had a stroke, which means even guessing the person does not have stroke can achieve the accuracy of 95%. If we do not deal with this imbalance, even the accuracy is high, the sensitivity may be rather low, which means the model cannot predict true positive cases very well, so we need to deal with this imbalance.
+
+Generate new sample using MWMOTE
+```{r}
+library(imbalance)
+set.seed(260)
+stroke <- stroke |> mutate(across(where(is.factor), as.numeric))
+stroke$stroke <- as.numeric(stroke$stroke)
+newSample <- mwmote(stroke, classAttr = "stroke", numInstances = 4611)
+newSample <- round(newSample)
+```
+
+Add generated sample to stroke database
+```{r}
+stroke <- rbind(stroke, newSample)
+rm(newSample)
+```
+
+
+Change stroke variables back to factor 
+```{r}
+stroke <- stroke |> mutate(gender = factor(gender, levels = c(1, 2),
+                                           labels = c("Female", "Male")),
+                           hypertension = factor(hypertension, levels = c(1, 2),
+                                                 labels = c("No", "Yes")),
+                           heart_disease = factor(heart_disease, levels = c(1, 2),
+                                                  labels = c("No", "Yes")),
+                           ever_married = factor(ever_married, levels = c(1, 2),
+                                                 labels = c("No", "Yes")),
+                           work_type = factor(work_type, levels = c(1, 2, 3, 4, 5),
+                              labels = c("children", "Never_worked", "Self-employed", "Private", "Govt_job")),
+                           Residence_type = factor(Residence_type, levels = c(1, 2),
+                                     labels = c("Rural", "Urban")),
+                           smoking_status = factor(smoking_status, levels = c(1, 2, 3), labels = c("never smoked", "formerly smoked", "smokes")),
+                           stroke = factor(stroke, levels = c(1, 2),
+                                           labels = c("No", "Yes")))
+```
+
+
+```{r}
+table(stroke$stroke)
+```
+
+
+### Model
+
+* Data spliting
+```{r}
+set.seed(260)
+train_index <- createDataPartition(y = stroke$stroke, p = 0.8, list = FALSE)
+train_set <- stroke[train_index, ]
+test_set <- stroke[-train_index, ]
+```
+
+* 10-fold validation
+```{r}
+control <- trainControl(method = "cv", number = 10, p = .9)
+```
+
+1. Logistic regression
+```{r, warning=FALSE}
+train_glm <- train(stroke ~ ., data = train_set, 
+                 method = "glm",
+                 trControl = control,
+                 family = "binomial")
+summary(train_glm)
+```
+
+* Stepwise logistic regression
+```{r, message=FALSE}
+library(MASS)
+fit_glm <- glm(stroke~., data = train_set,
+               family = "binomial")
+step_glm <- stepAIC(fit_glm)
+```
+```{r}
+summary(step_glm)
+```
+
+Prediction for logistic regression
+```{r}
+test_set$stroke_hat_glm <- predict(train_glm, test_set)
+cm <- confusionMatrix(test_set$stroke_hat_glm, test_set$stroke)
+cm$overall["Accuracy"]
+```
+
+Confusion matrix plot
+```{r}
+test_set$stroke_hat_glm <- as.character(test_set$stroke_hat_glm)
+conf_mat <- evaluate(test_set, target_col = "stroke", prediction_cols = "stroke_hat_glm", 
+                        type = "binomial", positive = "Yes")
+plot_confusion_matrix(conf_mat)
+```
+
+Prediction for stepwise logistic regression
+```{r}
+p_hat_step <- predict(step_glm, test_set)
+test_set$stroke_hat_step <- ifelse(p_hat_step > 0.5, "Yes", "No") |> factor()
+cm <- confusionMatrix(test_set$stroke_hat_step, test_set$stroke)
+cm$overall["Accuracy"]
+```
+
+Confusion matrix plot
+```{r, warning=FALSE}
+test_set$stroke_hat_step <- as.character(test_set$stroke_hat_step)
+conf_mat <- evaluate(test_set, target_col = "stroke", prediction_cols = "stroke_hat_step", 
+                        type = "binomial", positive = "Yes")
+plot_confusion_matrix(conf_mat)
+```
+
+
+2. Random Forest
+```{r}
+library(ranger)
+set.seed(260)
+grid <- data.frame(
+  .mtry = seq(1, 11, 1),
+  .splitrule = "gini",
+  .min.node.size = 0
+)
+
+train_rf <- train(stroke ~ ., data = train_set, 
+                  method = "ranger", 
+                  trControl = control, 
+                  tuneGrid = grid)
+```
+
+
+```{r}
+set.seed(260)
+fit_rf <- randomForest(stroke ~ ., data = train_set,
+                       mtry = train_rf$bestTune$mtry)
+```
+
+Error vs # trees
+```{r}
+plot(fit_rf)
+```
+
+predict
+```{r}
+test_set$stroke_hat_rf <- predict(fit_rf, test_set)
+cm <- confusionMatrix(test_set$stroke_hat_rf, test_set$stroke)
+cm
+```
+
+Confusion matrix plot
+```{r, warning=FALSE}
+test_set$stroke_hat_rf <- as.character(test_set$stroke_hat_rf)
+conf_mat <- evaluate(test_set, target_col = "stroke", prediction_cols = "stroke_hat_rf", 
+                        type = "binomial", positive = "Yes")
+plot_confusion_matrix(conf_mat)
+```
+
+Importance of the variables in terms of making predictions
+```{r}
+varImpPlot(fit_rf)
+```
+
+
+4. Gradient Boosted Trees
+```{r, message=FALSE, warning=FALSE}
+library(xgboost)
+set.seed(260)
+
+xgbGrid <- expand.grid(
+    nrounds = 3500,
+    max_depth = 7,
+    eta = 0.01,
+    gamma = 0.01,
+    colsample_bytree = 0.75,
+    min_child_weight = 0,
+    subsample = 0.5
+)
+
+xgbControl <- trainControl(
+    method = "cv",
+    number = 5
+)
+
+train_xgb <- train(
+    stroke ~ ., data = train_set,
+    method = "xgbTree",
+    tuneLength = 10,
+    tuneGrid = xgbGrid,
+    trControl = xgbControl
+)
+```
+
+predict
+```{r}
+test_set$stroke_hat_xgb <- predict(train_xgb, test_set)
+cm <- confusionMatrix(test_set$stroke_hat_xgb, test_set$stroke)
+cm$overall["Accuracy"]
+```
+
+Confusion matrix plot
+```{r}
+test_set$stroke_hat_xgb <- as.character(test_set$stroke_hat_xgb)
+conf_mat <- evaluate(test_set, target_col = "stroke", prediction_cols = "stroke_hat_xgb", 
+                        type = "binomial", positive = "Yes")
+plot_confusion_matrix(conf_mat)
+```
+
+
+5. KNN
+```{r}
+set.seed(260)
+
+train_knn <- train(stroke ~ ., data = train_set, 
+                   method = "knn",
+                   trControl = control,
+                   tuneGrid = data.frame(k = seq(1, 25, 2)))
+
+ggplot(train_knn, highlight = TRUE)
+```
+
+fit knn model
+```{r}
+fit_knn <- knn3(stroke ~ ., data = train_set, k = 2)
+```
+
+
+predict
+```{r}
+test_set$stroke_hat_knn <- predict(fit_knn, test_set, type="class")
+cm <- confusionMatrix(test_set$stroke_hat_knn, test_set$stroke)
+cm$overall["Accuracy"]
+```
+
+
+Confusion matrix plot
+```{r, warning=FALSE}
+test_set$stroke_hat_knn <- as.character(test_set$stroke_hat_knn)
+conf_mat <- evaluate(test_set, target_col = "stroke", prediction_cols = "stroke_hat_knn", 
+                        type = "binomial", positive = "Yes")
+plot_confusion_matrix(conf_mat)
+```
+
+
+6. SVM
+```{r, message=FALSE, warning=FALSE}
+set.seed(260)
+library(kernlab)
+grid <- data.frame(C = seq(0.1, 1, 0.1))
+train_svm <- train(stroke ~ ., data = train_set,
+                   method = "svmLinear",
+                   trControl = control,
+                   tuneGrid = grid)
+train_svm
+```
+
+predict
+```{r}
+test_set$stroke_hat_svm <- predict(train_svm, test_set)
+cm <- confusionMatrix(test_set$stroke_hat_svm, test_set$stroke)
+cm$overall["Accuracy"]
+```
+
+Confusion matrix plot
+```{r, warning=FALSE}
+test_set$stroke_hat_svm <- as.character(test_set$stroke_hat_svm)
+conf_mat <- evaluate(test_set, target_col = "stroke", prediction_cols = "stroke_hat_svm", 
+                        type = "binomial", positive = "Yes")
+plot_confusion_matrix(conf_mat)
+```
+
+
+7. Linear discriminant analysis
+```{r}
+set.seed(260)
+train_lda <- train(stroke ~ ., data = train_set, 
+                    method = "lda",
+                    family = "binomial",
+                    trControl = control)
+train_lda
+```
+
+
+predict
+```{r}
+test_set$stroke_hat_lda <- predict(train_lda, test_set)
+cm <- confusionMatrix(test_set$stroke_hat_lda, test_set$stroke)
+cm$overall["Accuracy"]
+```
+
+
+Confusion matrix plot
+```{r, warning=FALSE}
+test_set$stroke_hat_lda <- as.character(test_set$stroke_hat_lda)
+conf_mat <- evaluate(test_set, target_col = "stroke", prediction_cols = "stroke_hat_lda", 
+                        type = "binomial", positive = "Yes")
+plot_confusion_matrix(conf_mat)
+```
+
+8. Neural Network
+
+```{r, warning=FALSE}
+set.seed(260)
+grid <- expand.grid(decay = c(0.05, 0.1),
+                        size = seq(30, 60, 10))
+control <- trainControl(method = "cv", number = 5)
+
+train_nnet <- train(stroke ~ ., data = train_set,
+                    method = "nnet",
+                    trControl = control,
+                    maxit = 1000, # maximum iteration
+                    preProcess = c('center', 'scale'), # standardize data
+                    trace = FALSE, # hide the training trace
+                    tuneGrid = grid)
+train_nnet
+```
+
+predict
+```{r}
+test_set$stroke_hat_nnet <- predict(train_nnet, test_set)
+cm <- confusionMatrix(test_set$stroke_hat_nnet, test_set$stroke)
+cm$overall["Accuracy"]
+```
+
+Confusion matrix plot
+```{r, warning=FALSE}
+test_set$stroke_hat_nnet <- as.character(test_set$stroke_hat_nnet)
+conf_mat <- evaluate(test_set, target_col = "stroke", prediction_cols = "stroke_hat_nnet", 
+                        type = "binomial", positive = "Yes")
+plot_confusion_matrix(conf_mat)
+```
