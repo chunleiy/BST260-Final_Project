@@ -6,7 +6,7 @@ output_dir: "."
 navbar:
   title: "My Website"
   left:
-    - text: "Home"
+    - text: "Report"
       href: index.html
-    - text: "BST260 Final Project"
-      href: Final_Project.html
+    - text: "Code and Plot"
+      href: code_plot.html
