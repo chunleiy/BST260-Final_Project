@@ -1,2 +1,75 @@
+# Regression Analysis and Machine Learning for Stroke Prediction
 
-This is my BST260 Final Project 
+## Introduction
+
+### Dataset and Question
+ 
+According to WHO, stroke has been the 2nd leading cause of death globally, responsible for approximately 11% of total deaths. It is meaningful to predict stroke incidence based on some health indicators.
+ 
+The dataset I used is from Kaggle, which includes categorical variables, such as gender, the incidence of hypertension and heart disease, marriage status, work type, residence type, and smoking status, and continuous variables, like age, the average glucose level in the blood, and BMI. The outcome variable is whether the patient had a stroke or not. This dataset contains 5110 observations in total.
+ 
+We want to study what characteristic of a patient is more likely to get a stroke and how to predict the incidence of stroke based on these factors. We will use all variables as predictors and stroke incidence as the outcome to build machine learning models and determine the model with the best accuracy. 
+ 
+### Data Cleaning
+
+Overall, this dataset is ready to use, but some places still need to be cleaned. BMI is stored as the character, so we need to change it to numeric data. Also, there are some NAs in the BMI column. Because only 3.93% of BMI records are missing, we can simply use the gender-specific BMI average to fill in those missing data. Also, there are 30.2% of smoking statuses missing. From missing data analysis, we can find out that the missing data for smoking may not be due to MCAR, so we cannot simply use mean or median to generate so much missing data. We need to use the mice (Multiple Imputation by Chained Equations) package, providing missing value imputation methods to generate missing values. 
+
+### EDA & Data Pre-Processing
+
+The Frequency of Categorical Levels plot displays the proportion of each variable and its categories. We can notice that in this sample, female is more than male (59% vs. 41%), and ever-married people are more than never-married people (66% vs. 34%). Also, 90% of people have no incidence of hypertension, and 95% of participants never had heart disease. More than half people never smoked, and 20% of the participants are smokers now. Note that 13% of participants are children. 
+
+The Histograms of Numeric Columns and data summary show that half of the people in this sample are aged between 25 to 61, with a mean of 43.2. Half of the people’s average glucose levels are between 77 and 114, with a mean of 106. Most people have a BMI of 20 to 40. 
+ 
+What’s more, we calculate the correlation between stroke and all other factors and make the plot. From this initial study, we can find there are four main driving factors that lead to the incidence of stroke, which are age (older compared to younger), heart disease, higher glucose level, and hypertension, which is expected based on our intuition. But we need to further study the association in our regression model.
+ 
+There is a very important issue with imbalanced data. We can notice that only 249 (4.9%) subjects have the incidence of stroke, which means even guessing the person does not have a stroke can achieve an accuracy of 95%. If we do not deal with this imbalance, even if the accuracy is high, the sensitivity may be rather low, which means the model cannot predict true positive cases very well, so we need to deal with this imbalance. I use the MWMOTE (majority Weighted Minority Oversampling Technique for Imbalanced Data Set Learning) method in the imbalance package to generate stroke data. The simulation results show that our method is better than or comparable with some other existing methods in terms of various assessment metrics. 
+ 
+### Methodology
+
+I will split my data to train data and test data into 80% and 20% and use 10-fold validation to perform cross-validation when we train the data. For the model choices, I use logistic regression, which is suitable for categorical data. Also, for the machine learning part, I use the random forest, boosted trees (XGBoost), KNN, SVM (support vector machine), LDA, and Neural Network methods in machine learning to train and test data. I will mainly use the caret package, providing me train function. And for some models, I will also use a tuning grid to find the best tune for this model to increase the accuracy. In the end, I will use the test data to predict the outcome and calculate the confusion matrix and get the accuracy of all these methods and find the best model.
+
+
+## Results
+
+### Logistic Regression
+
+First, I fit a logistic regression including all variables. Based on the summary table of logistic regression, we can notice that age, hypertension, heart disease, average glucose level, BMI, and smoking are significantly associated with the incidence of stroke, controlling for all other variables. Furthermore, I chose a stepwise method based on AIC to remove non-significant variables. In the stepwise logistic regression model, gender and residence type are removed. We find that age (older), average glucose level (higher), BMI (lower), heart disease, hypertension, and smoking are a statistically significant impact on whether a person has a stroke or not. Most of them are expected, while BMI is negatively associated with the incidence of stroke. It may be due to some selection bias in this data sample. One of the most detrimental factors is smoking. The odds ratio of the incidence of stroke among people who are smokers now is 2.03 times higher than those who have never smoked. Even the odds ratio among former smokers is 2.07 times higher. Also, the odds ratio of the incidence of stroke increases by 11% for every year increase in age, and the p-value is almost 0, so age is highly associated with the incidence of stroke. What’s more, the odds ratio among people who has hypertension and among people with heart disease is 45.3% and 34.2% higher. Those estimates agree well with our EDA.
+ 
+Logistic regression is very useful for us to determine what characteristic of a patient is more likely to get a stroke, but it is not a good method to predict because the accuracy for logistic regression and stepwise logistic regression is 0.827 and 0.809, not good enough. We need to use some other machine learning methods to get the better prediction.
+ 
+### Random Forest
+
+Random forest is a great machine learning approach to address the shortcomings of decision trees, improving prediction performance and reducing instability by averaging multiple decision trees. Also, instead of the “rf” method, I use the “ranger” method to increase the speed of calculation for random forest algorithms. From the plot of random forest fit, we can see the error does not decrease when the number of trees is larger than 300. The random forest model gets a very high accuracy of 0.9393. The sensitivity is 0.9208, and the specificity is 0.9578
+ 
+I also evaluate the importance of the variables in terms of making predictions. From the plot of importance, we can find the dominant predictor is age, which importance is far beyond other variables. Also, the other two main predictors are BMI and average glucose level. It seems that only continous variables have more importance.
+ 
+### Gradient Boosted Trees
+
+Like random forests, gradient boosting trees also combine decision trees but start the combining process at the beginning instead of at the end. Random forests build each tree independently, while gradient boosting builds one tree at a time. Usually, gradient boosting trees will get better accuracy than random forests. For the stroke dataset, the gradient boosting trees model has an accuracy of 0.9594, with a sensitivity of 0.9578 and specificity of 0.9609, which are high enough. 
+           
+### KNN
+
+In KNN, the outcome is classified by a plurality vote of its neighbors, which is a very popular model. However, KNN seems to perform not so well dealing with categorical data. This is true when many of the scales in my model are categorical. It is hard to tell the distance between numerical and categorical variables like age and marital status, or within categorical variables, like private work and self-employed. We want to find out the optimized k for our KNN model, and we find 2 is the optimized k. In conclusion, although the accuracy is 0.8704, I think it is not appropriate to use KNN for this dataset. 
+ 
+### SVM
+
+SVM (Support Vector Machine) is a model that draws a boundary that clearly separates two or more classes for classification. We need to choose different C values to tune our model. The accuracy for SVM is relatively low, 0.8266.
+
+### LDA 
+
+LDA (Linear Discriminant Analysis) is a generalization of Fisher's linear discriminant to find a linear combination of features that characterizes or separates two or more classes of objects or events. We also fit the LDA model using caret, and the accuracy is 0.8272, which is not good enough.
+ 
+
+### Neural Network
+
+A neural network is a biologically inspired method for computers to learn through analyzing data. We can use the nnet package to fit a single-hidden-layer feed-forward neural network using multinomial log-linear models. Also, we use the caret package to train the model. We need to set the tuning grid. The tuning parameters are weight (decay), and the number of hidden units (size). Also, set the maximum iteration to 1000. The accuracy is 0.9208, which is relatively high. 
+
+
+## Conclusion
+
+From our logistic regression and stepwise regression model, age, higher average glucose level, heart disease, hypertension, and smoking are the main factors to increase the risk of stroke. People with these characteristics should pay much more attention to the potential incidence of stroke. Even as a former smoker, the odds ratio of the incidence of stroke is 2.07 times higher than those who never smoke. Therefore, it is important to choose not to smoke at the beginning to decrease the risk. Also, there is an 11% increase in adds ratio for every year increase in age, so aged people should have regular body exams for potential stroke. Also, other diseases, like hypertension, heart disease, and high glucose level, are also highly associated with the increasing risk of stroke, and this may cause more severe outcomes if the disease is composite. Although we cannot change our age, we could form a good life from healthy diet or regular training to diminish other risk factors such as heart disease, hypertension, or average glucose level, and be a non-smoker, for your health and decrease the risk of stroke. 
+
+Based on our machine learning model, including random forest, gradient boosting trees (XGBoost), KNN, SVM (support vector machine), LDA, and Neural Network, we train these models using caret package and find that random forest, gradient boosting trees, and Neural Network performs relatively better. The model with the best accuracy is gradient boosting trees, with an accuracy of 0.9594, sensitivity of 0.9578, and specificity of 0.9609. The accuracy is higher than 95%, which could be a satisfactory result. The models with the worst accuracy is SVM and LDA, with accuracy of 0.8266 and 0.8272. In conclusion, I would choose gradient boosting trees model for stroke prediction.
+
+The potential issue is the imbalanced data problem. I use MWMOTE to generate data, but they are not categorical, so I just round them to the nearest integer, which may cause some inaccuracy. Also, from the importance plot for the random forest, categorical data does not contribute much to the prediction compared to the continuous variable, and it may limit the accuracy of the random forest. I want to investigate further how to deal with imbalanced data and how to better train categorical data in machine learning nad learn some advanced models in the future. 
+
